@@ -29,4 +29,12 @@ public class QuestionService {
         return "success";
 
     }
+
+    public String deleteQuestion(Integer id) {
+        if(questionDAO.existsById(id)){
+            questionDAO.deleteById(id);
+            return "success";
+        }
+        return "Id not Found";
+    }
 }
