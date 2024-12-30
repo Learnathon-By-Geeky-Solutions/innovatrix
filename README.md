@@ -118,10 +118,12 @@ Password: password
 ## Entity Structure
 ```java
 Restaurant {
-    Long id
-    String name
-    String address
-    String cuisine
+    private  Long id;
+    private String name;
+    private String address;
+    private String cuisine;
+    private String isOpen;
+    private String date;
 }
 ```
 
