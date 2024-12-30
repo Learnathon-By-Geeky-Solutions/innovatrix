@@ -37,4 +37,21 @@ public class QuestionService {
         }
         return "Id not Found";
     }
+
+    public String updateQuestion(Integer id, Question question) {
+        if (questionDAO.existsById(id)){
+            Question existingQuestion=questionDAO.findById(id).orElse(null);
+            if(existingQuestion!=null){
+                existingQuestion.setQuestionTitle(question.getQuestionTitle());
+                existingQuestion.setOption1(question.getOption1());
+                existingQuestion.setOption2(question.getOption2());
+                existingQuestion.setOption3(question.getOption3());
+                existingQuestion.setAnswer(question.getAnswer());
+                existingQuestion.setDifficultyLevel(question.getDifficultyLevel());
+                questionDAO.save(existingQuestion);
+                return "successfully Updated";
+            }
+        }
+        return "Id not found";
+    }
 }
