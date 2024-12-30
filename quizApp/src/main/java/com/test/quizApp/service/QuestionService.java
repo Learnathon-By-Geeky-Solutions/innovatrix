@@ -19,4 +19,14 @@ public class QuestionService {
         return questions;
 
     }
+
+    public List<Question> getQuestionByCategory(String category) {
+        return questionDAO.findByDifficultyLevel(category);
+    }
+
+    public String addQuestion(Question question) {
+        questionDAO.save(question);
+        return "success";
+
+    }
 }
