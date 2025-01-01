@@ -1,2 +1,3 @@
 practise/Scrum-12-CRUD-Practise-Fairuz
 git push origin practise/Scrum-12-CRUD-Practise-Fairuz
+./mvnw spring-boot:run
