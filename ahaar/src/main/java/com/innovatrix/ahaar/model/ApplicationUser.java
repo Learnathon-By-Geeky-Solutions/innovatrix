@@ -1,12 +1,16 @@
 package com.innovatrix.ahaar.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.innovatrix.ahaar.DTO.ApplicationUserDTO;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.io.Serializable;
 
 
+@EqualsAndHashCode(callSuper = true)
 @Data
+@ToString(exclude = "password")
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
@@ -27,7 +31,8 @@ public class ApplicationUser extends Auditable<String> implements Serializable {
 
 	@Column(
 			name = "user_name",
-			nullable = false
+			nullable = false,
+			unique = true
 	)
 	private String userName;
 
@@ -42,6 +47,7 @@ public class ApplicationUser extends Auditable<String> implements Serializable {
 			name = "password",
 			nullable = false
 	)
+	@JsonIgnore
 	private String password;
 
 	public ApplicationUser(String userName, String email, String password) {

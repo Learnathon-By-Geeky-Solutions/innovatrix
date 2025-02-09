@@ -1,32 +1,42 @@
 package com.innovatrix.ahaar.service;
 
-import com.innovatrix.ahaar.exception.NoDataFoundException;
+import com.innovatrix.ahaar.exception.UserNotFoundException;
+
 import com.innovatrix.ahaar.model.ApplicationUser;
-import com.innovatrix.ahaar.model.ApplicationUserDTO;
+import com.innovatrix.ahaar.DTO.ApplicationUserDTO;
+import com.innovatrix.ahaar.DTO.LoginDTO;
 import com.innovatrix.ahaar.repository.UserRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 @Service
-public class
-UserService implements UserServiceInterface {
-    UserRepository userRepository;
+public class UserService implements UserServiceInterface {
 
-    @Autowired
+    private UserRepository userRepository;
+
+    private AuthenticationManager authenticationManager;
+
+    private BCryptPasswordEncoder bCryptPasswordEncoder;
+
+    private JWTService jwtService;
+
     private RedisService redisService;
 
-    private static final String REDIS_PREFIX = "USER:";
-
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, AuthenticationManager authenticationManager, BCryptPasswordEncoder bCryptPasswordEncoder, JWTService jwtService, RedisService redisService) {
         this.userRepository = userRepository;
+        this.authenticationManager = authenticationManager;
+        this.bCryptPasswordEncoder = bCryptPasswordEncoder;
+        this.jwtService = jwtService;
+        this.redisService = redisService;
     }
 
     public Page<ApplicationUser> getUsers(int page, int size) {
@@ -57,62 +67,74 @@ UserService implements UserServiceInterface {
         if (userOptional.isPresent()) {
             throw new IllegalStateException("User with this email already exists");
         }
-        checkConditions(user);
-        userRepository.save(user.toEntity());
-        return userRepository.findByEmail(user.getEmail());
+//        checkConditions(user);
+        user.setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
+        return Optional.of(userRepository.save(user.toEntity()));
     }
 
     @Transactional
     public ApplicationUser updateUser(Long userId, ApplicationUserDTO user) {
         Optional<ApplicationUser> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
-            throw new IllegalStateException("User with this id does not exist");
+            throw new UserNotFoundException(userId);
         }
         if(user.getEmail().isEmpty() || user.getPassword().isEmpty() || user.getUserName().isEmpty()) {
-            throw new IllegalStateException(
+            throw new IllegalArgumentException(
                     "Required fields are missing in update operation"
             );
         }
 
-        checkConditions(user);
+//        checkConditions(user);
         userOptional.get().setUserName(user.getUserName());
         userOptional.get().setEmail(user.getEmail());
-        userOptional.get().setPassword(user.getPassword());
+        userOptional.get().setPassword(bCryptPasswordEncoder.encode(user.getPassword()));
 
-        userRepository.save(userOptional.get());
-        return userOptional.get();
+        return userRepository.save(userOptional.get());
     }
 
     public void deleteUser(Long id) {
         Optional<ApplicationUser> userOptional = userRepository.findById(id);
         if (userOptional.isEmpty()) {
-            throw new IllegalStateException("User with this id does not exist");
+            throw new UserNotFoundException(id);
         }
         userRepository.deleteById(id);
     }
 
-
-
     public Optional<ApplicationUser> getUserById(Long id) {
-        String redisKey = REDIS_PREFIX + id;
 
-        // Check if the user is in Redis cache
-        ApplicationUser cachedUser = redisService.get(redisKey,ApplicationUser.class);
+        try {
+            String redisKey = RedisService.REDIS_PREFIX + id;
+            // Check if the user is in Redis cache
+            ApplicationUser cachedUser = redisService.get(redisKey, ApplicationUser.class);
 
-        if (cachedUser != null) {
-            // Return user from Redis cache
-            return Optional.of(cachedUser);
-        }
-        else{
+            if (cachedUser != null) {
+                // Return user from Redis cache
+                return Optional.of(cachedUser);
+            } else {
+                throw new UserNotFoundException(id);
+            }
+        } catch (Exception e) {
             Optional<ApplicationUser> userOptional = userRepository.findById(id);
             if (userOptional.isEmpty()) {
-                throw new NoDataFoundException("User of this id does not exist in Database.");
+
+                throw new UserNotFoundException(id);
             }
-            redisService.set(redisKey, userOptional.get(), 1);
+            try {
+                redisService.set(RedisService.REDIS_PREFIX + id, userOptional.get(), 1);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
             return userOptional;
-
         }
-
-
     }
+    @Override
+    public String login(LoginDTO loginDTO) {
+        Authentication authentication = authenticationManager
+                        .authenticate(new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword()));
+        if(authentication.isAuthenticated()) {
+            return jwtService.generateToken(loginDTO.getUsername());
+        }
+        throw new IllegalStateException("Authentication failed");
+    }
+
 }
