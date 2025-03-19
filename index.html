@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Tracker (Google Geolocation API)</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #location {
+            font-size: 18px;
+            margin-top: 10px;
+            color: green;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Live Location Tracker 🌍 (Google API)</h2>
+    <p id="status">Fetching your location...</p>
+    <p id="location">Latitude: -- | Longitude: --</p>
+    <p id="accuracy">Accuracy: </p>
+    <p id="error"></p>
+    <p id="city"></p>
+    <p id="district"></p>
+    <p id="region"></p>
+    <p id="country"></p>
+
+    <script>
+        if ("geolocation" in navigator) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    const latitude = position.coords.latitude;
+                    const longitude = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+
+                    document.getElementById("status").innerText = `Location fetched successfully!`;
+                    document.getElementById("location").innerText = `Latitude: ${latitude} | Longitude: ${longitude}`;
+                    document.getElementById("accuracy").innerText = `Accuracy: ${accuracy} meters`;
+
+                    // Fetch location details from backend
+                    fetch(`http://localhost:3000/reverse-geocode?lat=${latitude}&lng=${longitude}`)
+                        .then(response => response.json())
+                        .then(locationData => {
+                            if (locationData.results && locationData.results.length > 0) {
+                                const addressComponents = locationData.results[0].address_components;
+                                let city = "Unknown", district = "Unknown", region = "Unknown", country = "Unknown";
+
+                                addressComponents.forEach(component => {
+                                    if (component.types.includes("locality")) city = component.long_name;
+                                    if (component.types.includes("administrative_area_level_2")) district = component.long_name;
+                                    if (component.types.includes("administrative_area_level_1")) region = component.long_name;
+                                    if (component.types.includes("country")) country = component.long_name;
+                                });
+
+                                document.getElementById("city").innerText = `City: ${city}`;
+                                document.getElementById("district").innerText = `District: ${district}`;
+                                document.getElementById("region").innerText = `Region: ${region}`;
+                                document.getElementById("country").innerText = `Country: ${country}`;
+                            } else {
+                                document.getElementById("status").innerText = "No location details found.";
+                            }
+                        })
+                        .catch(error => {
+                            document.getElementById("status").innerText = "Error fetching location details!";
+                            console.error("Error:", error);
+                        });
+                },
+                (error) => {
+                    document.getElementById("status").innerText = "Error fetching location!";
+                    document.getElementById("error").innerText = `Error: ${error.message}`;
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 20000,
+                    maximumAge: 0
+                }
+            );
+        } else {
+            document.getElementById("status").innerText = "Geolocation is not supported.";
+        }
+    </script>
+
+</body>
+</html>
