@@ -8,14 +8,17 @@ spring:
     password: ${env.DEV_DB_PASSWORD}
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+    database-platform: org.hibernate.spatial.dialect.postgis.PostgisDialect
 
   data:
     redis:
       host: ${env.DEV_REDIS_HOST}
       port: ${env.DEV_REDIS_PORT}
+
+

@@ -1,16 +1,17 @@
 package com.innovatrix.ahaar.service;
 
-import com.innovatrix.ahaar.dto.JwtResponseDTO;
-import com.innovatrix.ahaar.dto.LoginDTO;
-import com.innovatrix.ahaar.dto.RestaurantOwnerDTO;
+import com.innovatrix.ahaar.dto.*;
+import com.innovatrix.ahaar.exception.ResourceNotFoundException;
+import com.innovatrix.ahaar.exception.UnauthorizedActionException;
 import com.innovatrix.ahaar.exception.UserNotFoundException;
-import com.innovatrix.ahaar.model.ApplicationUser;
-import com.innovatrix.ahaar.model.RefreshToken;
-import com.innovatrix.ahaar.model.RestaurantOwner;
-import com.innovatrix.ahaar.model.Role;
+import com.innovatrix.ahaar.model.*;
+import com.innovatrix.ahaar.repository.FoodItemRepository;
 import com.innovatrix.ahaar.repository.RestaurantOwnerRepository;
+import com.innovatrix.ahaar.repository.RestaurantRepository;
 import com.innovatrix.ahaar.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
+import org.locationtech.jts.geom.Point;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,11 +22,16 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
+@Slf4j
 public class RestaurantOwnerService {
+
     private final RestaurantOwnerRepository restaurantOwnerRepository;
+    private final RestaurantRepository restaurantRepository;
 
     private AuthenticationManager authenticationManager;
 
@@ -39,8 +45,12 @@ public class RestaurantOwnerService {
 
     private final RefreshTokenService refreshTokenService;
 
+    private final LocationService locationService;
+
+    private final FoodItemRepository foodItemRepository;
+
     @Autowired
-    public RestaurantOwnerService(RestaurantOwnerRepository restaurantOwnerRepository, AuthenticationManager authenticationManager, BCryptPasswordEncoder bCryptPasswordEncoder, JWTService jwtService, UserRepository userRepository, RedisService redisService, RefreshTokenService refreshTokenService) {
+    public RestaurantOwnerService(RestaurantOwnerRepository restaurantOwnerRepository, AuthenticationManager authenticationManager, BCryptPasswordEncoder bCryptPasswordEncoder, JWTService jwtService, UserRepository userRepository, RedisService redisService, RefreshTokenService refreshTokenService, LocationService locationService, RestaurantRepository restaurantRepository, FoodItemRepository foodItemRepository) {
         this.restaurantOwnerRepository = restaurantOwnerRepository;
         this.authenticationManager = authenticationManager;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
@@ -48,6 +58,9 @@ public class RestaurantOwnerService {
         this.userRepository = userRepository;
         this.redisService = redisService;
         this.refreshTokenService = refreshTokenService;
+        this.locationService = locationService;
+        this.restaurantRepository = restaurantRepository;
+        this.foodItemRepository = foodItemRepository;
     }
 
     public Page<RestaurantOwner> getAll(int page, int size) {
@@ -67,7 +80,7 @@ public class RestaurantOwnerService {
             throw new IllegalStateException("This email is already in use");
         }
 
-        RestaurantOwner restaurantOwner = new RestaurantOwner(new ApplicationUser(restaurantOwnerDTO.getUserName(), restaurantOwnerDTO.getEmail(), bCryptPasswordEncoder.encode(restaurantOwnerDTO.getPassword()), Role.RESTAURANT_OWNER ),
+        RestaurantOwner restaurantOwner = new RestaurantOwner(new ApplicationUser(restaurantOwnerDTO.getUserName(), restaurantOwnerDTO.getEmail(), bCryptPasswordEncoder.encode(restaurantOwnerDTO.getPassword()), Role.RESTAURANT_OWNER),
                 restaurantOwnerDTO.getName(), restaurantOwnerDTO.getPhoneNumber(), restaurantOwnerDTO.getNID());
         return restaurantOwnerRepository.save(restaurantOwner);
     }
@@ -110,11 +123,10 @@ public class RestaurantOwnerService {
                 .map(RefreshToken::getUser)
                 .map(userInfo -> {
                     String accessToken = jwtService.generateToken(userInfo.getUserName());
-                    JwtResponseDTO jwtResponseDTO = JwtResponseDTO.builder()
+                    return JwtResponseDTO.builder()
                             .accessToken(accessToken)
                             .refreshToken(token)
                             .build();
-                    return jwtResponseDTO;
                 }).orElse(null);
 
     }
